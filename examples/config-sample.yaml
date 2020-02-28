@@ -1,0 +1,7 @@
+gitlab:
+  api-base: https://gitlab.com/api/v4
+  api-key: the-api-key
+  secret-token: my-token
+scanoss:
+  url: https://api-url-for-scanoss.example.com
+  token: my-scanoss-token

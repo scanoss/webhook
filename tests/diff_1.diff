@@ -1,0 +1,181 @@
+diff --git a/grappa/operators/__init__.py b/grappa/operators/__init__.py
+index a2a41d4..ab9efdc 100644
+--- a/grappa/operators/__init__.py
++++ b/grappa/operators/__init__.py
+@@ -20,6 +20,7 @@
+     ('within',      'WithinOperator'),
+     ('present',     'PresentOperator'),
+     ('contain',     'ContainOperator'),
++    ('only',        'ContainOnlyOperator'),
+     ('callable',    'CallableOperator'),
+     ('property',    'PropertyOperator'),
+     ('pass_test',   'PassTestOperator'),
+diff --git a/grappa/operators/contain.py b/grappa/operators/contain.py
+index 4ae15d2..c8ebea5 100644
+--- a/grappa/operators/contain.py
++++ b/grappa/operators/contain.py
+@@ -52,7 +52,7 @@ class ContainOperator(Operator):
+ 
+     # Subject template message
+     subject_message = Operator.Dsl.Message(
+-        'an value of type "{type}" with content "{value}"',
++        'a value of type "{type}" with content "{value}"',
+     )
+ 
+     # Stores types to normalize before the assertion
+diff --git a/grappa/operators/equal.py b/grappa/operators/equal.py
+index 5290dd2..2ab955e 100644
+--- a/grappa/operators/equal.py
++++ b/grappa/operators/equal.py
+@@ -51,7 +51,7 @@ class EqualOperator(Operator):
+ 
+     # Subject message template
+     subject_message = Operator.Dsl.Message(
+-        'an value of type "{type}" with data "{value}"',
++        'a value of type "{type}" with data "{value}"',
+     )
+ 
+     def match(self, subject, expected):
+diff --git a/grappa/operators/only.py b/grappa/operators/only.py
+new file mode 100644
+index 0000000..8181216
+--- /dev/null
++++ b/grappa/operators/only.py
+@@ -0,0 +1,47 @@
++import six
++from grappa.log import log
++from .contain import ContainOperator
++from ..operator import Operator
++
++
++class ContainOnlyOperator(ContainOperator):
++    """
++    Asserts if only the given value or values can be found
++    in a another object.
++
++    Example::
++
++        # Should style
++        ['foo', 'bar'] | should.contain.only('foo', 'bar')
++        [{'foo': True}, 'bar'] | should.contain.only({'foo': True}, 'bar')
++
++        # Should style - negation form
++        ['foo', 'bar'] | should.do_not.contain.only('baz')
++        ('foo', 'bar') | should.do_not.contain.only('foo', 'bar', 'extra')
++
++        # Expect style
++        ['foo', 'bar'] | expect.to.contain.only('foo', 'bar')
++        [{'foo': True}, 'bar'] | expect.to.contain.only('bar', {'foo': True})
++
++        # Expect style - negation form
++        ['foo', 'bar'] | expect.to_not.contain.only('bar')
++        ['foo', 'bar'] | expect.to_not.contain.only('baz', 'foo')
++        ['foo', 'bar'] | expect.to_not.contain.only('bar', 'foo', 'extra')
++    """
++    operators = ('only', 'just',)
++    expected_message = Operator.Dsl.Message(
++        'a value that contains only "{value}"',
++        'a value that does not contain only "{value}"',
++    )
++
++    def match(self, subject, *expected):
++        contains_all, reasons = super(ContainOnlyOperator, self)\
++            .match(subject, *expected)
++        # Add check that no other item is in expected
++        if contains_all is True:
++            # Handle string case
++            if isinstance(subject, six.string_types):
++                log.warn('String comparison using "only" is not advised')
++                return (subject == expected[0]), []
++            return super(ContainOnlyOperator, self).match(expected, *subject)
++        return contains_all, reasons
+diff --git a/grappa/operators/present.py b/grappa/operators/present.py
+index 13b75b7..fc7a0c1 100644
+--- a/grappa/operators/present.py
++++ b/grappa/operators/present.py
+@@ -46,7 +46,7 @@ class PresentOperator(Operator):
+     information = (
+         Operator.Dsl.Help(
+             Operator.Dsl.Description(
+-                'An present object is the oposite of an empty object.'
++                'An present object is the opposite of an empty object.'
+             )
+         ),
+     )
+diff --git a/grappa/reporters/subject.py b/grappa/reporters/subject.py
+index f65bf3f..30f7d2d 100644
+--- a/grappa/reporters/subject.py
++++ b/grappa/reporters/subject.py
+@@ -34,7 +34,6 @@ def run(self, error):
+         # Get expectation message, if present in the operator
+         attribute = '{}_message'.format(self.attribute)
+         text_message = self.from_operator(attribute, None)
+-
+         if text_message:
+             # Check if message is present and is a negation expression
+             if isinstance(text_message, Message):
+@@ -44,7 +43,7 @@ def run(self, error):
+             # Render template
+             text_message = self.render_tmpl(
+                 self.indentify(text_message),
+-                self.normalize(value)
++                value
+             )
+ 
+         # Return template text message
+diff --git a/requirements-dev.txt b/requirements-dev.txt
+index 36679b9..967d588 100755
+--- a/requirements-dev.txt
++++ b/requirements-dev.txt
+@@ -7,3 +7,4 @@ Sphinx~=1.5.3
+ sphinx-rtd-theme~=0.1.9
+ python-coveralls~=2.9.0
+ bumpversion~=0.5.3
++mock~=2.0.0
+diff --git a/tests/operators/only_test.py b/tests/operators/only_test.py
+new file mode 100644
+index 0000000..9955b10
+--- /dev/null
++++ b/tests/operators/only_test.py
+@@ -0,0 +1,41 @@
++# coding: utf-8
++import pytest
++try:
++    from unittest import mock
++except ImportError:
++    import mock
++
++
++def test_should_contain_only(should):
++    [1, 2] | should.contain.only(1, 2)
++    # dicts/list + different order in expected values
++    [{'foo': 'bar'}, 2] | should.contain.only(2, {'foo': 'bar'})
++    ('foo', 'bar', 123) | should.contain.only('bar', 123, 'foo')
++    'hello' | should.contain.only('hello')  # string case
++    # chainability
++    ([], 'ab', 42) | should.contain.only(42, 'ab', []) | should.have.length(3)
++
++    with pytest.raises(AssertionError):
++        ['a', '∆˚'] | should.contain.only('a')  # missing items
++
++    with pytest.raises(AssertionError):
++        'abc' | should.contain.only('def')  # string case unequal
++
++    with pytest.raises(AssertionError):
++        [321, '∆˚'] | should.contain.only('∆˚', 'b')  # different item
++
++    with pytest.raises(AssertionError):
++        # too many items
++        [
++            {'foo': 'bar'},
++            {'meaning': 42}
++        ] | should.contain.only([], {'foo': 'bar'}, {'meaning': 42})
++
++
++def test_should_contain_only_string_case(should):
++    """Should log a warning when using the only operator for strings."""
++    with mock.patch('grappa.operators.only.log') as log:
++        'lala' | should.contain.only('lala')
++        log.warn.assert_called_once_with(
++            'String comparison using "only" is not advised'
++        )

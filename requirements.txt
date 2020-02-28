@@ -1,0 +1,4 @@
+requests
+crc32c
+pyyaml
+pyjwt[crypto]

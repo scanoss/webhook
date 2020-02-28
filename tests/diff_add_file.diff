@@ -1,0 +1,56 @@
+diff --git a/tests/context.py b/tests/context.py
+index e69de29..349ae8a 100644
+--- a/tests/context.py
++++ b/tests/context.py
+@@ -0,0 +1,7 @@
++# -*- coding: utf-8 -*-
++
++import sys
++import os
++sys.path.insert(0, os.path.abspath('..'))
++
++import sample
+\ No newline at end of file
+diff --git a/tests/test_advanced.py b/tests/test_advanced.py
+index e69de29..5438ac3 100644
+--- a/tests/test_advanced.py
++++ b/tests/test_advanced.py
+@@ -0,0 +1,16 @@
++# -*- coding: utf-8 -*-
++
++from .context import sample
++
++import unittest
++
++
++class AdvancedTestSuite(unittest.TestCase):
++    """Advanced test cases."""
++
++    def test_thoughts(self):
++        sample.hmm()
++
++
++if __name__ == '__main__':
++    unittest.main()
+\ No newline at end of file
+diff --git a/tests/test_basic.py b/tests/test_basic.py
+index e69de29..d3e4d5a 100644
+--- a/tests/test_basic.py
++++ b/tests/test_basic.py
+@@ -0,0 +1,16 @@
++# -*- coding: utf-8 -*-
++
++from .context import sample
++
++import unittest
++
++
++class BasicTestSuite(unittest.TestCase):
++    """Basic test cases."""
++
++    def test_absolute_truth_and_meaning(self):
++        assert True
++
++
++if __name__ == '__main__':
++    unittest.main()

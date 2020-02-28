@@ -1,0 +1,84 @@
+diff --git a/package-lock.json b/package-lock.json
+index 2d6c529d490..eb50c7ba3a0 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2805,20 +2805,6 @@
+         "parse-json": "^4.0.0"
+       }
+     },
+-    "coveralls": {
+-      "version": "3.0.7",
+-      "resolved": "https://registry.npmjs.org/coveralls/-/coveralls-3.0.7.tgz",
+-      "integrity": "sha512-mUuH2MFOYB2oBaA4D4Ykqi9LaEYpMMlsiOMJOrv358yAjP6enPIk55fod2fNJ8AvwoYXStWQls37rA+s5e7boA==",
+-      "dev": true,
+-      "requires": {
+-        "growl": "~> 1.10.0",
+-        "js-yaml": "^3.13.1",
+-        "lcov-parse": "^0.0.10",
+-        "log-driver": "^1.2.7",
+-        "minimist": "^1.2.0",
+-        "request": "^2.86.0"
+-      }
+-    },
+     "create-error-class": {
+       "version": "3.0.2",
+       "resolved": "https://registry.npmjs.org/create-error-class/-/create-error-class-3.0.2.tgz",
+@@ -5658,12 +5644,6 @@
+       "integrity": "sha1-TK+tdrxi8C+gObL5Tpo906ORpyU=",
+       "dev": true
+     },
+-    "growl": {
+-      "version": "1.10.5",
+-      "resolved": "https://registry.npmjs.org/growl/-/growl-1.10.5.tgz",
+-      "integrity": "sha512-qBr4OuELkhPenW6goKVXiv47US3clb3/IbuWF9KNKEijAy9oeHxU9IgzjvJhHkUzhaj7rOUD7+YGWqUjLp5oSA==",
+-      "dev": true
+-    },
+     "gzip-size": {
+       "version": "4.1.0",
+       "resolved": "https://registry.npmjs.org/gzip-size/-/gzip-size-4.1.0.tgz",
+@@ -7230,12 +7210,6 @@
+         "invert-kv": "^1.0.0"
+       }
+     },
+-    "lcov-parse": {
+-      "version": "0.0.10",
+-      "resolved": "https://registry.npmjs.org/lcov-parse/-/lcov-parse-0.0.10.tgz",
+-      "integrity": "sha1-GwuP+ayceIklBYK3C3ExXZ2m2aM=",
+-      "dev": true
+-    },
+     "leven": {
+       "version": "3.1.0",
+       "resolved": "https://registry.npmjs.org/leven/-/leven-3.1.0.tgz",
+@@ -7418,12 +7392,6 @@
+       "integrity": "sha1-7GZi5IlkCO1KtsVCo5kLcswIACA=",
+       "dev": true
+     },
+-    "log-driver": {
+-      "version": "1.2.7",
+-      "resolved": "https://registry.npmjs.org/log-driver/-/log-driver-1.2.7.tgz",
+-      "integrity": "sha512-U7KCmLdqsGHBLeWqYlFA0V0Sl6P08EE1ZrmA9cxjUE0WVqT9qnyVDPz1kzpFEP0jdJuFnasWIfSd7fsaNXkpbg==",
+-      "dev": true
+-    },
+     "log-symbols": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/log-symbols/-/log-symbols-3.0.0.tgz",
+diff --git a/package.json b/package.json
+index b0b27de44b7..1556823c00c 100644
+--- a/package.json
++++ b/package.json
+@@ -20,7 +20,6 @@
+   "scripts": {
+     "start": "npm-run-all --parallel watch docs-serve",
+     "bundlesize": "bundlesize",
+-    "coveralls": "cat js/coverage/lcov.info | coveralls",
+     "css": "npm-run-all css-compile css-prefix css-minify",
+     "css-compile": "node-sass --output-style expanded --source-map true --source-map-contents true --precision 6 scss/ -o dist/css/",
+     "css-lint": "npm-run-all --continue-on-error --parallel css-lint-*",
+@@ -96,7 +95,6 @@
+     "babel-plugin-istanbul": "^5.2.0",
+     "bundlesize": "^0.18.0",
+     "clean-css-cli": "^4.3.0",
+-    "coveralls": "^3.0.7",
+     "cross-env": "^6.0.3",
+     "eslint": "^6.6.0",
+     "eslint-config-xo": "^0.27.2",
