@@ -11,6 +11,7 @@ from http.server import HTTPServer
 from scanoss.bitbucket import BitbucketRequestHandler
 from scanoss.gitlab import GitLabRequestHandler
 from scanoss.github import GitHubRequestHandler
+from scanoss.gitee import GiteeRequestHandler
 
 from functools import partial
 
@@ -37,7 +38,7 @@ def get_parser():
                       default=8888,
                       metavar="PORT",
                       help="port where it listens")
-  parser.add_argument("--handler", dest="handler", choices=['gitlab', 'github', 'bitbucket'],
+  parser.add_argument("--handler", dest="handler", choices=['github', 'gitee', 'gitlab', 'bitbucket'],
                       default="gitlab", metavar="HANDLER", help="webhook handler")
 
   parser.add_argument("--cfg",
@@ -65,6 +66,11 @@ def main():
     handler = partial(GitHubRequestHandler, config)
   elif args.handler == 'bitbucket':
     handler = partial(BitbucketRequestHandler, config)
+  elif args.handler == 'gitee':
+    handler = partial(GiteeRequestHandler, config)
+  else:
+    print("ERROR: Invalid Handler")
+    sys.exit(1)
 
   httpd = HTTPServer((args.addr, args.port),
                      handler)
