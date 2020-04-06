@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="scanoss-webhook-integration",
-    version="1.0.0",
+    version="1.1.0",
     author="SCANOSS",
     author_email="info@scanoss.co.uk",
     setup_requires=["pytest-runner"],
