@@ -3,10 +3,14 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
+import codecs
 import json
 from json.decoder import JSONDecodeError
 import logging
+import os
 import requests
+import shutil
+import time
 import uuid
 
 from .winnowing import wfp_for_file
@@ -50,6 +54,9 @@ class Scanner:
     """ Performs a scan of the files given
 
     """
+    logging.debug("Starting scan")
+    if not asset_json:
+      logging.info("Scanning files without oss_assets.json")
     if not files:
       logging.debug("No files found and no scan performed")
       return None
@@ -63,6 +70,10 @@ class Scanner:
       files_index += 1
       files_conversion[str(files_index)] = file
       wfp += wfp_for_file(files_index, contents)
+    # For Troubleshooting store the resulting WFP
+    wfp_file = "scan_wfp_%s" % time.time()
+    with open("/tmp/%s" % wfp_file, "w") as f:
+      f.write(wfp)
 
     headers = {'X-Session': self.token}
     scan_files = {
@@ -75,35 +86,54 @@ class Scanner:
     if r.status_code >= 400:
       return None
     try:
+      with codecs.open("/tmp/scan_result_%s" % time.time(), 'w', 'utf-8') as f:
+        f.write(r.text)
+    except:
+      logging.error("Error serialising scan result")
+    try:
       json_resp = r.json()
     except JSONDecodeError:
       logging.error("The SCANOSS API returned an invalid JSON")
+      # For Troubleshooting copy wfp file to failed_wfps folder
+      if not os.path.exists('failed_wfps'):
+        os.makedirs('failed_wfps')
+      shutil.copyfile('/tmp/%s' % wfp_file, 'failed_wfps/%s' % wfp_file)
       return None
+    logging.debug("Scan completed")
     return {files_conversion[k]: v for (k, v) in json_resp.items()}
 
-  def format_scan_results(self, scan_results):
+  def format_scan_results(self, scan_results, repository_url):
     """
-    This function formats scan result as a markdown comment. Returns a dictionary with a validation flag and the comment string.
+    This function formats scan result as a markdown comment. Returns a structure with a validation flag.
     """
-    # Troubleshooting ONLY
-    with open("/tmp/scan_results", "w") as f:
-      f.write(json.dumps(scan_results))
-
-    matches = []
+    logging.debug("Formatting scan results for repository: %s", repository_url)
+    matches = {}
     for f, m in scan_results.items():
+
       if m[0].get('id') != 'null':
+        result = {"component": "", "url": "", "lines": "", "also": []}
         for match in m:
-          matches.append(
-              [f, match['vendor'], match['component'], match['version']])
+          match_id = match.get('id')
+          # We ignore results containing the same repository as the current one
+          if match_id and match_id != 'none' and repository_url not in match.get('url'):
+            if not result['component']:
+              result['component'] = match['component']
+              result['url'] = match['url']
+              result['lines'] = match['lines']
+            elif match['component'] and match['component'] != 'N/A':
+              result['also'].append(match['component'])
+        # Only add result for file if there is a component found.
+        if result['component']:
+          matches[f] = result
     if not matches:
       return {"validation": True, "comment": self.comment_verified_ok}
     else:
       comment = self.comment_verified_failed + "\n\n"
-      comment += "**Found %d Undeclared OSS Assets**\n\n| File | Vendor | Component | Version |\n| --- | --- | --- | ---:|\n" % len(
+      comment += "**Found %d Undeclared OSS Assets**\n\n| File | Component | Lines | Also In |\n| --- | --- | --- | ---:|\n" % len(
           matches)
 
-      for match in matches:
-        comment += "| %s | %s | %s | %s |\n" % (
-            match[0], match[1], match[2], match[3])
+      for f, match in matches.items():
+        comment += "| %s | [%s](%s) | %s | %s |\n" % (f,
+                                                      match['component'], match['url'], match['lines'], ','.join(match['also']))
 
       return {"validation": False, "comment": comment}

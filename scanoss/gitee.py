@@ -20,6 +20,8 @@ GITEE_HEADER_TIMESTAMP = "X-Gitee-Timestamp"
 GITEE_HEADER_EVENT = "X-Gitee-Event"
 
 GITEE_EVENT_PUSH = "Push Hook"
+GITEE_EVENT_ISSUE = "Issue Hook"
+GITEE_EVENT_NOTE = "Note Hook"
 
 
 class GiteeAPI:
@@ -38,8 +40,9 @@ class GiteeAPI:
     """
     # https://gitee.com/api/v5/repos/{owner}/{repo}/commits/{sha}
 
-    commit_url = "%s/repos/%s/commits/%s" % (self.base_url, path, commit['ID'])
-    r = requests.get(commit_url, params={"access_token", self.api_key})
+    commit_url = "%s/repos/%s/commits/%s" % (self.base_url, path, commit['id'])
+    logging.debug("Using commit URL: %s", commit_url)
+    r = requests.get(commit_url, params={"access_token": self.api_key})
     if r.status_code != 200:
       logging.error(
           "There was an error requesting commit details from Gitee: %d %s", r.status_code, r.text)
@@ -49,24 +52,26 @@ class GiteeAPI:
     files = {}
     for file in payload.get('files'):
       r = requests.get(file["content_url"], params={
-                       "access_token", self.api_key})
+                       "access_token": self.api_key})
       if r.status_code != 200:
         logging.error(
             "There was an error obtaining the contents for the file: %s", file['filename'])
       else:
         file_payload = r.json()
         base64_content = file_payload['content'].encode('ascii')
-        contents = base64.b64decode(base64_content).decode('ascii')
+        contents = base64.b64decode(base64_content)
+        logging.debug("Successfully retrieved contents for file: %s, size: %d",
+                      file['filename'], file_payload['size'])
         files[file['filename']] = contents
     return files
 
   def post_commit_comment(self, path, commit, comment):
     comments_url = "%s/repos/%s/commits/%s/comments" % (
-        self.base_url, path, commit['ID'])
+        self.base_url, path, commit['id'])
     logging.debug("Posting comment to URL: %s, comment: %s",
                   comments_url, comment)
-    r = requests.post(comments_url, json={"body": comment},
-                      data={"access_token": self.api_key})
+    r = requests.post(comments_url,
+                      data={"access_token": self.api_key, "body": comment})
     if r.status_code >= 400:
       logging.error(
           "There was an error posting a comment for commit, the server returned status %d, and response: %s", r.status_code, r.text)
@@ -84,31 +89,18 @@ class GiteeAPI:
     url = "%s/repos/%s/contents/%s" % (self.base_url, path, filename)
     logging.debug('Getting file contents from url: %s', url)
     r = requests.get(url,
-                     params={"ref": commit["ID"], "access_token": self.api_key})
-                  
+                     params={"ref": commit["id"], "access_token": self.api_key})
+
     if r.status_code == 200:
       file_payload = r.json()
+      logging.debug("Successfully retrieved contents for file: %s, size: %d",
+                    filename, file_payload['size'])
       base64_content = file_payload['content'].encode('ascii')
-      contents = base64.b64decode(base64_content).decode('ascii')
+      contents = base64.b64decode(base64_content)
       return contents
-    logging.error("There was an error obtaining the content for file: %s, %d, %s", filename, r.status_code, r.text)
+    logging.error("There was an error obtaining the content for file: %s, %d, %s",
+                  filename, r.status_code, r.text)
     return None
-
-# TODO Implement update build status for commit.
-  # def update_build_status(self, statuses_url, commit, status=False):
-
-  #   logging.debug("Updating build status for commit %s", commit['id'])
-  #   url = statuses_url.replace("{sha}", commit['id'])
-  #   data = {"state": GH_STATUS_SUCC if status else GH_STATUS_FAIL}
-  #   r = requests.post(url, json=data, auth=(self.api_user, self.api_key))
-  #   if r.status_code >= 400:
-  #     logging.error(
-  #         "There was an error updating build status for commit %s", commit['id'])
-
-  # def validate_secret_token(self, gh_token, payload):
-  #   digest = "sha1="+hmac.new(self.secret_token.encode('utf-8'),
-  #                             payload.encode('utf-8'), hashlib.sha1).hexdigest()
-  #   return digest == gh_token
 
 
 class GiteeRequestHandler(BaseHTTPRequestHandler):
@@ -129,7 +121,14 @@ class GiteeRequestHandler(BaseHTTPRequestHandler):
     logging.debug("Received payload from Gitee")
     with open('/tmp/gitee_headers_%s' % time.time(), 'w') as f:
       f.write(self.headers.as_string())
-      # We are only interested in push events
+    
+    # GET Payload
+    header_length = int(self.headers['Content-Length'])
+    payload = self.rfile.read(header_length).decode()
+    with open('/tmp/gitee_payload_%s' % time.time(), 'w') as f:
+      f.write(payload)
+    
+    # We are only interested in push events
     if self.headers.get(GITEE_HEADER_EVENT) != GITEE_EVENT_PUSH:
       logging.debug("Ignoring event: %s", self.headers.get(GITEE_HEADER_EVENT))
       self.send_response(200, "OK")
@@ -144,11 +143,7 @@ class GiteeRequestHandler(BaseHTTPRequestHandler):
       self.end_headers()
       return
 
-    # GET Payload
-    header_length = int(self.headers['Content-Length'])
-    payload = self.rfile.read(header_length).decode()
-    with open('/tmp/gitee_payload_%s' % time.time(), 'w') as f:
-      f.write(payload)
+    
 
     if len(payload) == 0:
       logging.warning("The Push event had an empty payload")
@@ -163,31 +158,28 @@ class GiteeRequestHandler(BaseHTTPRequestHandler):
       self.end_headers()
       return
     repo = json_payload.get('repository')
+    
     if not repo:
       self.send_response(400, "Malformed JSON")
       logging.error("No repository provided by the JSON payload")
       self.end_headers()
       return
 
-    repo_path = json_payload.get('path_with_namespace')
-    if not repo_path:
-      self.send_response(400, "Malformed JSON")
-      logging.error("No repository path provided by the JSON payload")
-      self.end_headers()
-      return
     # Return success response and process commit.
     logging.debug("Returning 200 OK")
     self.send_response(200, "OK")
     self.end_headers()
-    self.process_commits_diff(repo_path, commits)
+    self.process_commits_diff(repo, commits)
 
-  def process_commits_diff(self, repo_path, commits):
+  def process_commits_diff(self, repo, commits):
     logging.debug("Processing commits")
+    repo_path = repo.get('path_with_namespace')
+    repo_url = repo.get('html_url')
 
     for commit in commits:
       files = self.api.get_files_in_commit(repo_path, commit)
       if not files:
-        logging.warning("No files found for commit %s", commit['ID'])
+        logging.warning("No files found for commit %s", commit['id'])
         return
 
       # Send diff to scanner and obtain results
@@ -195,7 +187,7 @@ class GiteeRequestHandler(BaseHTTPRequestHandler):
       scan_result = self.scanner.scan_files(files, asset_json)
       if scan_result:
         # Add a comment to the commit
-        comment = self.scanner.format_scan_results(scan_result)
+        comment = self.scanner.format_scan_results(scan_result, repo_url)
         if comment:
 
           self.api.post_commit_comment(repo_path, commit, comment['comment'])
