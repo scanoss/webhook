@@ -5,123 +5,85 @@
 
 from http.server import BaseHTTPRequestHandler
 from typing import Any
-
+from github import Github
 import json
-import hashlib
-import hmac
 import logging
-import requests
+import hmac
+import hashlib
+
+from github.Commit import Commit
+
+from github.Repository import Repository
 from scanoss.scanner import Scanner
-from scanoss.diff_parser import parse_diff
+from scanoss.winnowing import wfp_for_file
+from scanoss.email_html import send_report_mail
 
 # CONSTANTS
+GH_VERSION = "1.0.1"
 GH_HEADER_EVENT = 'X-GitHub-Event'
 GH_HEADER_SIGNATURE = 'X-Hub-Signature'
 
 GH_EVENT_PUSH = 'push'
 GH_EVENT_PING = 'ping'
+GH_EVENT_PR = 'pull_request'
 
 GH_CONTENTS_PATH = '{+path}'
 
 GH_STATUS_SUCC = 'success'
 GH_STATUS_FAIL = 'failure'
 
+MSG_VALIDATED = "Automated code review complete"
+MSG_NO_VALIDATED = "You PR/commit has been forwarded to AWS Trusted Committers for review."
+class GitHubRequestHandler(BaseHTTPRequestHandler):
+  """A Github webhook request handler.
 
-class GitHubAPI:
   """
-  Several GitHub API utilities
-  """
 
-  def __init__(self, config):
-    self.api_key = config['github']['api-key']
-    self.api_user = config['github']['api-user']
-    self.base_url = config['github']['api-base']
-    self.secret_token = config['github']['secret-token']
+  def __init__(self, config,logger: logging, *args: Any) -> None:
+    self.config = config
+    self.scanner = Scanner(config)
+    self.email_config = {}
+    self.logger = logger
+    try:
+      self.api_base = config['github']['api-base']
+      self.api_key = config['github']['api-key']
+      self.g = Github(base_url = self.api_base, login_or_token= self.api_key)
+      #self.g = Github(self.api_key)
+    except Exception:
+      self.logger.error("There is an error in the github section in the config file")
+      return
+    try:
+        self.secret_token = config['github']['secret-token']
+        self.db = [config['scanoss']['db1'], config['scanoss']['db2']]
+        self.comment_always = config['scanoss']['comment_always']
+    except Exception:
+        self.logger.error("There is an error in the scanoss section in the config file")
 
-  def get_commit_diff(self, commit) -> str:
-    request_url = "%s.diff" % commit['url']
+    try:
+      self.email_config['user']  = config['email_report']['user']
+      self.email_config['pass']  = config['email_report']['pass']
+      self.email_config['dest']  = config['email_report']['dest']
+      self.email_config['enable']  = config['email_report']['enable']
+    except Exception:
+      self.logger.error("There is an error in the email report section in the config file")
+  
+    BaseHTTPRequestHandler.__init__(self, *args)
 
-    r = requests.get(request_url, auth=(self.api_user, self.api_key))
-    if r.status_code != 200:
-      logging.error(
-          "There was an error trying to obtain diff for commit, the server returned status %d", r.status_code)
-      return None
-    return r.text
-
-  def get_files_in_commit_diff(self, commit):
-    """ Return a list containing the names of all the files mentioned in a commit.
-    """
-    diff = self.get_commit_diff(commit)
-    obj, _ = parse_diff(diff)
-    return list(obj.keys())
-
-  def post_commit_comment(self, repository, commit, comment):
-
-    comments_url = "%s/comments" % repository.get('commits_url').replace(
-        '{/sha}', '/'+commit['id'])
-    logging.debug("Posting comment to URL: %s, comment: %s",
-                  comments_url, comment)
-    r = requests.post(comments_url, json={"body": comment},
-                      auth=(self.api_user, self.api_key))
-    if r.status_code >= 400:
-      logging.error(
-          "There was an error posting a comment for commit, the server returned status %d, and response: %s", r.status_code, r.text)
-
-  def get_assets_json_file(self, contents_url, commit):
-    return self.get_file_contents(contents_url, commit, "oss_assets.json")
-
-  def get_file_contents(self, contents_url, commit, filename) -> bytes:
-    """ Returns the contents of a file in a commit as a byte array.
-    """
-    url = contents_url.replace(GH_CONTENTS_PATH, filename)
-    logging.debug('Getting file contents from url: %s', url)
-    r = requests.get(url, auth=(self.api_user, self.api_key),
-                     params={"ref": commit["id"]})
-    if r.status_code == 200:
-      # obtain the download_url and request content from that URL
-      contents_obj = r.json()
-      r = requests.get(contents_obj['download_url'])
-      return r.text.encode()
-    return None
-
-  def update_build_status(self, statuses_url, commit, status=False):
-
-    logging.debug("Updating build status for commit %s", commit['id'])
-    url = statuses_url.replace("{sha}", commit['id'])
-    data = {"state": GH_STATUS_SUCC if status else GH_STATUS_FAIL}
-    r = requests.post(url, json=data, auth=(self.api_user, self.api_key))
-    if r.status_code >= 400:
-      logging.error(
-          "There was an error updating build status for commit %s", commit['id'])
+  def do_GET(self):
+    self.logger.info("PING received")
+    repo_list = self.g.get_repos().get_page(0)
+    self.logger.debug(repo_list[0])
+    resp = {"version":GH_VERSION, "gh_api_test":repo_list[:10]}
+    self.send_response(200, resp)
+    self.end_headers()
+    return
 
   def validate_secret_token(self, gh_token, payload):
     digest = "sha1="+hmac.new(self.secret_token.encode('utf-8'),
                               payload.encode('utf-8'), hashlib.sha1).hexdigest()
     return digest == gh_token
 
-
-class GitHubRequestHandler(BaseHTTPRequestHandler):
-  """A Github webhook request handler.
-
-  """
-
-  def __init__(self, config, *args: Any) -> None:
-    self.config = config
-    self.scanner = Scanner(config)
-    self.base_url = self.config['github']['api-base']
-    self.api = GitHubAPI(config)
-    logging.debug("Starting GitHubRequestHandler with base_url: %s",
-                  self.base_url)
-    BaseHTTPRequestHandler.__init__(self, *args)
-
   def do_POST(self):
-
-    # We are only interested in push events
-    if self.headers.get(GH_HEADER_EVENT) != GH_EVENT_PUSH:
-      self.send_response(200, "OK")
-      self.end_headers()
-      return
-
     # get payload
     header_length = int(self.headers['Content-Length'])
     json_payload = self.rfile.read(header_length).decode()
@@ -131,18 +93,11 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     if len(json_payload) > 0:
       json_params = json.loads(json_payload)
 
-     # Validate GH Secret
+         # Validate GH Secret
     gh_token = self.headers.get(GH_HEADER_SIGNATURE)
-    if not self.api.validate_secret_token(gh_token, json_payload):
+    if not self.validate_secret_token(gh_token, json_payload):
       logging.error("Not authorized, Invalid Github signature: %s", gh_token)
       self.send_response(401, "Invalid Github signature")
-      self.end_headers()
-      return
-
-    # If there are no commits, return
-    commits = json_params.get("commits")
-    if not commits:
-      self.send_response(200, "OK")
       self.end_headers()
       return
 
@@ -152,42 +107,133 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
 
     except KeyError:
       self.send_response(400, "Malformed JSON")
-      logging.error("No repository provided by the JSON payload")
+      self.logger.error("No repository provided by the JSON payload")
       self.end_headers()
       return
     logging.debug("Returning 200 OK")
     self.send_response(200, "OK")
     self.end_headers()
-    self.process_commits_diff(repository, commits)
+    event = self.headers.get(GH_HEADER_EVENT)
+    self.logger.info(event)
+    if event == GH_EVENT_PR:
+      pr = json_params.get("pull_request")
+      if pr.get("state") == "open":
+        self.process_pr(repository, pr)
+    elif event == GH_EVENT_PUSH:
+          # If there are no commits, return
+      commits = json_params.get("commits")
+      if not commits:
+        logging.debug("NO COMMITS!!")
+        self.send_response(200, "OK")
+        self.end_headers()
+        return
 
-  def process_commits_diff(self, repository, commits):
-    logging.debug("Processing commits")
-    contents_url = repository.get('contents_url')
-    # For each commit in push
-    files = {}
+      self.process_commits_diff(repository, commits)
+    else:
+      self.send_response(200, "OK")
+      self.end_headers()
+      return
+
+  def process_gh_request(self, repository):
+    repo_name = repository.get('name')
+    repo_own = repository.get('owner')
+    repo_type = repo_own.get('type')
+    self.logger.debug(repo_own)
+    self.logger.debug(repo_type)
+    if repo_type == "Organization":
+      repo = self.g.get_organization(repo_own.get('login')).get_repo(repo_name)
+      logging.info("Organization mode")
+    else:
+      repo = self.g.get_user().get_repo(repo_name)
+      logging.info("User mode")
+    return repo
+  
+  def process_pr(self,repository, pr):
+    self.logger.info("Processing PR")
+    repo = self.process_gh_request(repository)
+    pull_resquest = repo.get_pull(pr.get('number'))
+    commits = pull_resquest.get_commits()
+    commits_results = "Processed Commit \t Validated \n"
+    summary_list = []
+    send_email = False
     for commit in commits:
+      self.logger.debug(commit.sha)
+      result, commits_response = self.process_commit(repo.get_commit(sha= commit.sha),comment_avoid=True)
+      if result is True:
+        commits_results += f"""{commit.sha} \t {MSG_VALIDATED} \n"""
+      else:
+        commits_results += f"""{commit.sha} \t {MSG_NO_VALIDATED} \n"""
+        summary_list.append(commits_response)
+        send_email = True
+    pull_resquest.create_issue_comment(commits_results)
+    self.logger.debug(commits_results)
+    self.logger.debug(summary_list)
+    if send_email:
+      email_error, email_error_message = send_report_mail(self.email_config, summary_list)
+      if email_error:
+        self.logger.error(email_error_message)
+      else:
+        self.logger.info(email_error_message)
+    self.logger.info("Finished processing PR")
+    return
 
-      # Get the contents of files in the commit
-      for filename in self.api.get_files_in_commit_diff(commit):
-
-        contents = self.api.get_file_contents(contents_url, commit, filename)
+  def process_commit(self, repo: Repository, commit_data: Commit, comment_avoid = False) -> bool:
+    files = {}
+    scan_result = {}
+    comment = {}
+    files = commit_data.raw_data.get('files')
+    commit_url = commit_data.raw_data.get('html_url')
+    logging.debug(json.dumps(commit_data.raw_data))
+    committer = commit_data.raw_data.get('commit')['committer']
+    commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
+    self.logger.debug(commit_url)
+    #get the diff lines
+    files = {}
+    for file in files:
+      logging.debug(file)
+      code = (file['patch'])
+      lines = code.split("\n")
+      file_scan = False
+      for line in lines: #if one line was added or changed scan the full file.
+        if line[0] == '+' or line[0] == 'M':
+          file_scan = True
+          break
+      #wfp calculation
+      if file_scan:
+        contents = repo.get_contents(file['path']) #self.api.get_file_contents(contents_url, commit, filename)
         if contents:
-          files[filename] = contents
-
-      # Send diff to scanner and obtain results
-      asset_json = self.api.get_assets_json_file(contents_url, commit)
-      scan_result = self.scanner.scan_files(files, asset_json)
-      if scan_result:
+          files[file['filename']] = contents
+    
+    asset_json = {}
+    asset_json = repo.get_contents("oss_assets.json")
+    scan_result = self.scanner.scan_files(files, asset_json)
+    if scan_result:
         # Add a comment to the commit
         comment = self.scanner.format_scan_results(scan_result)
         if comment:
+          commit_data.create_comment(comment)
+          validation = False
+        else:
+          validation = True
+    return validation, commit_info
 
-          self.api.post_commit_comment(repository, commit, comment['comment'])
-          # Update build status for commit
-          self.api.update_build_status(
-              repository['statuses_url'], commit, comment['validation'])
-          logging.info("Updated comment and build status")
 
+  def process_commits_diff(self, repository, commits):
+    self.logger.info("Processing commits")
+    repo = self.process_gh_request(repository)
+    summary_list = []
+    send_email = False
+    for commit in commits:
+      #get commit
+      validation, commit_result = self.process_commit(repo.get_commit(sha=commit['id']), False)
+      summary_list.append(commit_result)
+      if not validation:
+        send_email = True
+
+    if send_email and  self.email_config['enable'] == True:
+      email_error, email_error_message = send_report_mail(self.email_config, summary_list)
+      if email_error:
+        self.logger.error(email_error_message)
       else:
-        logging.info("The server returned no result for scan")
-    logging.debug("Finished processing commits")
+        self.logger.info(email_error_message)
+    self.logger.info("Finished processing commits")
