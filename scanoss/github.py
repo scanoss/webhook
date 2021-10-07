@@ -39,22 +39,21 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
 
   """
 
-  def __init__(self, config,logger: logging, *args: Any) -> None:
+  def __init__(self, config, logger: logging, *args: Any) -> None:
     self.config = config
     self.scanner = Scanner(config)
     self.email_config = {}
+    self.email_config['enable'] = False
     self.logger = logger
     try:
       self.api_base = config['github']['api-base']
       self.api_key = config['github']['api-key']
       self.g = Github(base_url = self.api_base, login_or_token= self.api_key)
-      #self.g = Github(self.api_key)
     except Exception:
       self.logger.error("There is an error in the github section in the config file")
       return
     try:
         self.secret_token = config['github']['secret-token']
-        self.db = [config['scanoss']['db1'], config['scanoss']['db2']]
         self.comment_always = config['scanoss']['comment_always']
     except Exception:
         self.logger.error("There is an error in the scanoss section in the config file")
@@ -158,7 +157,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     send_email = False
     for commit in commits:
       self.logger.debug(commit.sha)
-      result, commits_response = self.process_commit(repo.get_commit(sha= commit.sha),comment_avoid=True)
+      result, commits_response = self.process_commit(repo,commit.sha)
       if result is True:
         commits_results += f"""{commit.sha} \t {MSG_VALIDATED} \n"""
       else:
@@ -166,9 +165,8 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
         summary_list.append(commits_response)
         send_email = True
     pull_resquest.create_issue_comment(commits_results)
-    self.logger.debug(commits_results)
     self.logger.debug(summary_list)
-    if send_email:
+    if send_email is True and self.email_config['enable'] is True:
       email_error, email_error_message = send_report_mail(self.email_config, summary_list)
       if email_error:
         self.logger.error(email_error_message)
@@ -177,18 +175,19 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     self.logger.info("Finished processing PR")
     return
 
-  def process_commit(self, repo: Repository, commit_data: Commit, comment_avoid = False) -> bool:
+  def process_commit(self, repo: Repository, commit_id) -> bool:
     files = {}
+    files_content = {}
     scan_result = {}
     comment = {}
+    commit_data = repo.get_commit(sha=commit_id)
     files = commit_data.raw_data.get('files')
     commit_url = commit_data.raw_data.get('html_url')
     logging.debug(json.dumps(commit_data.raw_data))
     committer = commit_data.raw_data.get('commit')['committer']
     commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
     self.logger.debug(commit_url)
-    #get the diff lines
-    files = {}
+    validation = True
     for file in files:
       logging.debug(file)
       code = (file['patch'])
@@ -200,22 +199,25 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
           break
       #wfp calculation
       if file_scan:
-        contents = repo.get_contents(file['path']) #self.api.get_file_contents(contents_url, commit, filename)
+        contents = repo.get_contents(file['filename']) #self.api.get_file_contents(contents_url, commit, filename)
         if contents:
-          files[file['filename']] = contents
-    
+          files_content[file['filename']] = contents.decoded_content
     asset_json = {}
-    asset_json = repo.get_contents("oss_assets.json")
-    scan_result = self.scanner.scan_files(files, asset_json)
+
+    try:
+      asset_json = repo.get_contents("oss_assets.json")
+    except Exception:
+      self.logger.info("No assets")
+
+    scan_result = self.scanner.scan_files(files_content, asset_json)
+    result = {'comment': 'No results', 'validation': True}
     if scan_result:
         # Add a comment to the commit
-        comment = self.scanner.format_scan_results(scan_result)
-        if comment:
-          commit_data.create_comment(comment)
-          validation = False
-        else:
-          validation = True
-    return validation, commit_info
+        result = self.scanner.format_scan_results(scan_result)
+        if result['comment']:
+          commit_data.create_comment(result['comment'])
+
+    return result['validation'], commit_info
 
 
   def process_commits_diff(self, repository, commits):
@@ -225,12 +227,12 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     send_email = False
     for commit in commits:
       #get commit
-      validation, commit_result = self.process_commit(repo.get_commit(sha=commit['id']), False)
+      validation, commit_result = self.process_commit(repo, commit['id'])
       summary_list.append(commit_result)
       if not validation:
         send_email = True
 
-    if send_email and  self.email_config['enable'] == True:
+    if send_email is True and  self.email_config['enable'] is True:
       email_error, email_error_message = send_report_mail(self.email_config, summary_list)
       if email_error:
         self.logger.error(email_error_message)

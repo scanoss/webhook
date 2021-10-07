@@ -11,6 +11,7 @@ from http.server import HTTPServer
 from scanoss.bitbucket import BitbucketRequestHandler
 from scanoss.gitlab import GitLabRequestHandler
 from scanoss.github import GitHubRequestHandler
+import logging.handlers as handlers
 
 from functools import partial
 
@@ -20,6 +21,9 @@ logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                     level=logging.DEBUG,
                     stream=sys.stdout)
 
+logger = logging.getLogger('scanoss-hook')
+logger.setLevel(logging.DEBUG)
+log_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
 def get_parser():
   """Returns the command line parser for the SCANOSS webhook.
@@ -59,10 +63,15 @@ def main():
     sys.exit(1)
 
   config = yaml.safe_load(args.cfg)
+
+  handler = handlers.TimedRotatingFileHandler("/var/log/scanoss-hook.log", when='midnight', interval=1)
+  handler.setFormatter(log_format)
+  logger.addHandler(handler)
+
   if args.handler == 'gitlab':
     handler = partial(GitLabRequestHandler, config)
   elif args.handler == 'github':
-    handler = partial(GitHubRequestHandler, config)
+    handler = partial(GitHubRequestHandler, config, logger)
   elif args.handler == 'bitbucket':
     handler = partial(BitbucketRequestHandler, config)
 

@@ -69,7 +69,7 @@ class Scanner:
         'file': ("%s.wfp" % uuid.uuid1().hex, wfp)}
 
     data = {"assets": asset_json} if asset_json else {}
-
+    logging.debug(wfp)
     r = requests.post(self.scan_url, files=scan_files,
                       data=data, headers=headers)
     if r.status_code >= 400:
@@ -91,19 +91,18 @@ class Scanner:
 
     matches = []
     for f, m in scan_results.items():
-      if m[0].get('id') != 'null':
+      if m[0].get('id') != 'none':
         for match in m:
-          matches.append(
-              [f, match['vendor'], match['component'], match['version']])
+          link = match['url'] + '/blob/' + match['version'] + '/' + match['file']
+          matches.append([f, match['purl'][0], match['version'], match['lines'], link, match['oss_lines']])
+   
     if not matches:
-      return {"validation": True, "comment": self.comment_verified_ok}
+      return {"validation": True, "comment": 'No matches'}
     else:
       comment = self.comment_verified_failed + "\n\n"
-      comment += "**Found %d Undeclared OSS Assets**\n\n| File | Vendor | Component | Version |\n| --- | --- | --- | ---:|\n" % len(
-          matches)
+      comment += "| File | Purl | Version | Lines | Link | OSS lines\n"
 
       for match in matches:
-        comment += "| %s | %s | %s | %s |\n" % (
-            match[0], match[1], match[2], match[3])
-
+        comment += "| %s | %s | %s | %s | %s | %s |\n" % (
+            match[0], match[1], match[2], match[3], match[4], match[5])
       return {"validation": False, "comment": comment}
