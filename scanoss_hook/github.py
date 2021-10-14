@@ -14,9 +14,9 @@ import hashlib
 from github.Commit import Commit
 
 from github.Repository import Repository
-from scanoss.scanner import Scanner
-from scanoss.winnowing import wfp_for_file
-from scanoss.email_html import send_report_mail
+from scanoss_hook.scanner import Scanner
+from scanoss_hook.winnowing import wfp_for_file
+from scanoss_hook.email_html import send_report_mail
 
 # CONSTANTS
 GH_VERSION = "1.0.1"
@@ -65,7 +65,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
       self.email_config['enable']  = config['email_report']['enable']
     except Exception:
       self.logger.error("There is an error in the email report section in the config file")
-  
+    logging.debug("---GITHUB SERVER START ---")
     BaseHTTPRequestHandler.__init__(self, *args)
 
   def do_GET(self):
@@ -138,12 +138,13 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     repo_own = repository.get('owner')
     repo_type = repo_own.get('type')
     self.logger.debug(repo_own)
+    logging.debug(repo_own.get('name'))
     self.logger.debug(repo_type)
     if repo_type == "Organization":
       repo = self.g.get_organization(repo_own.get('login')).get_repo(repo_name)
       logging.info("Organization mode")
     else:
-      repo = self.g.get_user().get_repo(repo_name)
+      repo = self.g.get_user(repo_own.get('name')).get_repo(repo_name)
       logging.info("User mode")
     return repo
   
@@ -209,7 +210,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     except Exception:
       self.logger.info("No assets")
 
-    scan_result = self.scanner.scan_files(files_content, asset_json)
+    scan_result = self.scanner.scan_files(files_content, asset_json.decoded_content)
     result = {'comment': 'No results', 'validation': True}
     if scan_result:
         # Add a comment to the commit

@@ -9,7 +9,7 @@ setup(
     tests_require=["pytest", "grappa"],
     install_requires=["requests", "crc32c", "pyyaml", "pyjwt[crypto]"],
     entry_points={
-        'console_scripts': ['scanoss-hook=scanoss.command_line:main'],
+        'console_scripts': ['scanoss-hook=scanoss_hook.command_line:main'],
     },
     packages=find_packages(),
     classifiers=[

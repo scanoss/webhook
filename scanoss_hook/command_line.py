@@ -4,15 +4,14 @@
 # license that can be found in the LICENSE file.
 import yaml
 import logging
+import logging.handlers as handlers
 import os
 import sys
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 from http.server import HTTPServer
-from scanoss.bitbucket import BitbucketRequestHandler
-from scanoss.gitlab import GitLabRequestHandler
-from scanoss.github import GitHubRequestHandler
-import logging.handlers as handlers
-
+from scanoss_hook.bitbucket import BitbucketRequestHandler
+from scanoss_hook.gitlab import GitLabRequestHandler
+from scanoss_hook.github import GitHubRequestHandler
 from functools import partial
 
 os.environ["PYTHONUNBUFFERED"] = "1"

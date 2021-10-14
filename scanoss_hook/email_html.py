@@ -32,6 +32,9 @@ def send_report_mail(config, commit_info):
     users = []
     emails = []
     for commit in commit_info:
+        if not commit['matches']:
+            continue
+        
         results = commit['matches']
         users.append(commit['user'])
         emails.append(commit['email'])

@@ -10,8 +10,8 @@ from typing import Any
 import json
 import logging
 import requests
-from scanoss.scanner import Scanner
-from scanoss.diff_parser import parse_diff
+from scanoss_hook.scanner import Scanner
+from scanoss_hook.diff_parser import parse_diff
 
 # CONSTANTS
 BB_HEADER_EVENT = 'X-Event-Key'
