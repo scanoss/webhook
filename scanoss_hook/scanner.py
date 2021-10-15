@@ -99,8 +99,7 @@ class Scanner:
     if not matches:
       return {"validation": True, "comment": 'No matches'}
     else:
-      comment = self.comment_verified_failed + "\n\n"
-      comment += "| File | Purl | Version | Lines | Link | OSS lines\n"
+      comment = "| Commit File | Detected PURL | Version |Commit diff lines | Source Link | Source lines |\n|-----------|-------------|---------------|-------------------|-------------|--------------|\n"
 
       for match in matches:
         comment += "| %s | %s | %s | %s | %s | %s |\n" % (

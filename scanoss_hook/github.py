@@ -203,21 +203,21 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
         contents = repo.get_contents(file['filename']) #self.api.get_file_contents(contents_url, commit, filename)
         if contents:
           files_content[file['filename']] = contents.decoded_content
-    asset_json = {}
 
     try:
-      asset_json = repo.get_contents("oss_assets.json")
+      asset_json = repo.get_contents("oss_assets.json").decoded_content
     except Exception:
       self.logger.info("No assets")
+      asset_json = {}
 
-    scan_result = self.scanner.scan_files(files_content, asset_json.decoded_content)
+    scan_result = self.scanner.scan_files(files_content, asset_json)
     result = {'comment': 'No results', 'validation': True}
     if scan_result:
         # Add a comment to the commit
-        result = self.scanner.format_scan_results(scan_result)
-        if result['comment']:
-          commit_data.create_comment(result['comment'])
-
+      result = self.scanner.format_scan_results(scan_result)
+    if result['comment']:
+      commit_data.create_comment(result['comment'])
+      self.logger.debug(result['comment'])
     return result['validation'], commit_info
 
 

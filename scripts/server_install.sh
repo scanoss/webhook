@@ -14,8 +14,8 @@ make dist
 WHEEL=$(ls dist/*.whl| awk -F'/' '{print $2}')
 echo "Pushing wheel: ${WHEEL}"
 scp dist/$WHEEL $SERVER:/root
-ssh $SERVER "pip3 install -U ${WHEEL}"
+ssh $SERVER "pip3 install --force-reinstall -U ${WHEEL}"
 # Systemd service configuration
 scp scripts/scanoss-hook-systemd.sh $SERVER:${DEST}
 scp scripts/scanoss-hook.service $SERVER:/etc/systemd/system
-#ssh $SERVER "systemctl stop scanoss-hook && systemctl daemon-reload && systemctl start scanoss-hook"
+ssh $SERVER "systemctl stop scanoss-hook && systemctl daemon-reload && systemctl start scanoss-hook"
