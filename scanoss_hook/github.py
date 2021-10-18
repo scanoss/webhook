@@ -10,13 +10,8 @@ import json
 import logging
 import hmac
 import hashlib
-
-from github.Commit import Commit
-
 from github.Repository import Repository
 from scanoss_hook.scanner import Scanner
-from scanoss_hook.winnowing import wfp_for_file
-from scanoss_hook.email_html import send_report_mail
 
 # CONSTANTS
 GH_VERSION = "1.0.1"
@@ -42,8 +37,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
   def __init__(self, config, logger: logging, *args: Any) -> None:
     self.config = config
     self.scanner = Scanner(config)
-    self.email_config = {}
-    self.email_config['enable'] = False
     self.logger = logger
     try:
       self.api_base = config['github']['api-base']
@@ -58,14 +51,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     except Exception:
         self.logger.error("There is an error in the scanoss section in the config file")
 
-    try:
-      self.email_config['user']  = config['email_report']['user']
-      self.email_config['pass']  = config['email_report']['pass']
-      self.email_config['dest']  = config['email_report']['dest']
-      self.email_config['enable']  = config['email_report']['enable']
-    except Exception:
-      self.logger.error("There is an error in the email report section in the config file")
-    logging.debug("---GITHUB SERVER START ---")
     BaseHTTPRequestHandler.__init__(self, *args)
 
   def do_GET(self):
@@ -155,7 +140,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     commits = pull_resquest.get_commits()
     commits_results = "Processed Commit \t Validated \n"
     summary_list = []
-    send_email = False
     for commit in commits:
       self.logger.debug(commit.sha)
       result, commits_response = self.process_commit(repo,commit.sha)
@@ -164,15 +148,9 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
       else:
         commits_results += f"""{commit.sha} \t {MSG_NO_VALIDATED} \n"""
         summary_list.append(commits_response)
-        send_email = True
     pull_resquest.create_issue_comment(commits_results)
     self.logger.debug(summary_list)
-    if send_email is True and self.email_config['enable'] is True:
-      email_error, email_error_message = send_report_mail(self.email_config, summary_list)
-      if email_error:
-        self.logger.error(email_error_message)
-      else:
-        self.logger.info(email_error_message)
+  
     self.logger.info("Finished processing PR")
     return
 
@@ -180,7 +158,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     files = {}
     files_content = {}
     scan_result = {}
-    comment = {}
     commit_data = repo.get_commit(sha=commit_id)
     files = commit_data.raw_data.get('files')
     commit_url = commit_data.raw_data.get('html_url')
@@ -188,7 +165,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     committer = commit_data.raw_data.get('commit')['committer']
     commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
     self.logger.debug(commit_url)
-    validation = True
     for file in files:
       logging.debug(file)
       code = (file['patch'])
@@ -225,18 +201,9 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     self.logger.info("Processing commits")
     repo = self.process_gh_request(repository)
     summary_list = []
-    send_email = False
     for commit in commits:
       #get commit
-      validation, commit_result = self.process_commit(repo, commit['id'])
+      _, commit_result = self.process_commit(repo, commit['id'])
       summary_list.append(commit_result)
-      if not validation:
-        send_email = True
 
-    if send_email is True and  self.email_config['enable'] is True:
-      email_error, email_error_message = send_report_mail(self.email_config, summary_list)
-      if email_error:
-        self.logger.error(email_error_message)
-      else:
-        self.logger.info(email_error_message)
     self.logger.info("Finished processing commits")

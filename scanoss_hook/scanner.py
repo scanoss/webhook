@@ -93,8 +93,7 @@ class Scanner:
     for f, m in scan_results.items():
       if m[0].get('id') != 'none':
         for match in m:
-          link = match['url'] + '/blob/' + match['version'] + '/' + match['file']
-          matches.append([f, match['purl'][0], match['version'], match['lines'], link, match['oss_lines']])
+          matches.append([f, match['purl'][0], match['version'], match['lines'], match['file_url'], match['oss_lines']])
    
     if not matches:
       return {"validation": True, "comment": 'No matches'}
