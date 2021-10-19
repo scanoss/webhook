@@ -45,6 +45,6 @@
     "dependency": "runtime",
     "homepage": "https://github.com/PyGithub/PyGithub",
     "license_url": "https://github.com/PyGithub/PyGithub/blob/master/COPYING",
-    "license": "MIT"
+    "license": "GNU"
   }
 ]
