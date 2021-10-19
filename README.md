@@ -43,7 +43,7 @@ Fill in the Add webhook form:
 - Add the webhook URL as the Payload URL
 - Select Content Type `application/json`
 - Add a secret
-- The webhook needs to receive `push` events only.
+- The webhook needs to receive `push` and/or `Pull Request` events.
 - Make sure that **Active** is checked.
 
 #### Configuration example
