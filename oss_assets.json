@@ -38,5 +38,13 @@
     "homepage": "https://pyjwt.readthedocs.io/",
     "license_url": "https://raw.githubusercontent.com/jpadilla/pyjwt/master/LICENSE",
     "license": "MIT"
+  },
+  {
+    "vendor": "PyGithub",
+    "component": "pygithub",
+    "dependency": "runtime",
+    "homepage": "https://github.com/PyGithub/PyGithub",
+    "license_url": "https://github.com/PyGithub/PyGithub/blob/master/COPYING",
+    "license": "MIT"
   }
 ]
