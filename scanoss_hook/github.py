@@ -38,6 +38,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     self.config = config
     self.scanner = Scanner(config)
     self.logger = logger
+    self.sbom_file = "SBOM.json"
     try:
       self.api_base = config['github']['api-base']
       self.api_key = config['github']['api-key']
@@ -48,6 +49,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     try:
         self.secret_token = config['github']['secret-token']
         self.comment_always = config['scanoss']['comment_always']
+        self.sbom_file = config['scanoss']['sbom_filename']
     except Exception:
         self.logger.error("There is an error in the scanoss section in the config file")
 
@@ -154,6 +156,8 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     self.logger.info("Finished processing PR")
     return
 
+
+
   def process_commit(self, repo: Repository, commit_id) -> bool:
     files = {}
     files_content = {}
@@ -162,8 +166,8 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     files = commit_data.raw_data.get('files')
     commit_url = commit_data.raw_data.get('html_url')
     logging.debug(json.dumps(commit_data.raw_data))
-    committer = commit_data.raw_data.get('commit')['committer']
-    commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
+    #committer = commit_data.raw_data.get('commit')['committer']
+    #commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
     self.logger.debug(commit_url)
     for file in files:
       logging.debug(file)
@@ -176,34 +180,42 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
           break
       #wfp calculation
       if file_scan:
-        contents = repo.get_contents(file['filename']) #self.api.get_file_contents(contents_url, commit, filename)
+        contents = repo.get_contents(file['filename'])
         if contents:
           files_content[file['filename']] = contents.decoded_content
 
     try:
-      asset_json = repo.get_contents("oss_assets.json").decoded_content
+      asset_json = repo.get_contents(self.sbom_file).decoded_content
     except Exception:
       self.logger.info("No assets")
       asset_json = {}
-
+    
+    self.logger.debug(asset_json)
     scan_result = self.scanner.scan_files(files_content, asset_json)
-    result = {'comment': 'No results', 'validation': True}
+    result = {'comment': 'No results', 'validation': True, 'cyclondx' : {}}
+    
     if scan_result:
-        # Add a comment to the commit
       result = self.scanner.format_scan_results(scan_result)
-    if result['comment']:
-      commit_data.create_comment(result['comment'])
-      self.logger.debug(result['comment'])
-    return result['validation'], commit_info
+    # Add a comment to the commit
+    if (not result['validation'] or self.comment_always) and result['comment']:
+      full_comment = result['comment']
+      if result['cyclondx']:
+        full_comment += "\n Please find the CycloneDX component details to add to your %s to declare the missing components here:\n" % self.sbom_file
+        if asset_json:
+          full_comment += "```\n"+ json.dumps(result['cyclondx']['components'], indent=2) + "\n```"
+        else:
+          full_comment += "```\n"+ json.dumps(result['cyclondx'], indent=2) + "\n```"
+      
+      self.logger.debug(full_comment)
+      commit_data.create_comment(full_comment)
+    return result['validation']#, commit_info
 
 
   def process_commits_diff(self, repository, commits):
     self.logger.info("Processing commits")
     repo = self.process_gh_request(repository)
-    summary_list = []
     for commit in commits:
       #get commit
-      _, commit_result = self.process_commit(repo, commit['id'])
-      summary_list.append(commit_result)
+      self.process_commit(repo, commit['id'])
 
     self.logger.info("Finished processing commits")

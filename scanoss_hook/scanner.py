@@ -81,10 +81,13 @@ class Scanner:
       return None
     return {files_conversion[k]: v for (k, v) in json_resp.items()}
 
+
   def format_scan_results(self, scan_results):
     """
     This function formats scan result as a markdown comment. Returns a dictionary with a validation flag and the comment string.
     """
+    cyclondx = {"bomFormat": "CycloneDX", "specVersion": "1.2",  "version": 1, "components" : [] }
+    cyclondx_components = []
     # Troubleshooting ONLY
     with open("/tmp/scan_results", "w") as f:
       f.write(json.dumps(scan_results))
@@ -94,13 +97,26 @@ class Scanner:
       if m[0].get('id') != 'none':
         for match in m:
           matches.append([f, match['purl'][0], match['version'], match['lines'], match['file_url'], match['oss_lines']])
-   
+          
+          lic = []
+          licenses = match['licenses']
+          logging.debug(licenses)
+          if licenses:
+            for l in licenses:
+              lic.append({ 'id': l["name"]})
+          
+          m_type = 'Snippet' if match['id'] == 'snippet' else 'Library'
+          component = {"type": m_type, "publisher": match["vendor"], "version": match['version'], "purl" : match['purl'][0], 'licenses': lic}
+          logging.debug(json.dumps(component))
+          cyclondx_components.append(component)
+   # cyclondx["components"] = list(set(cyclondx_components)) # remove duplicated
+    cyclondx["components"] = cyclondx_components
     if not matches:
-      return {"validation": True, "comment": 'No matches'}
+      return {"validation": True, "comment": "SCANOSS webhook has not found matches for this commit", "cyclondx" : {}}
     else:
       comment = "| Commit File | Detected PURL | Version |Commit diff lines | Source Link | Source lines |\n|-----------|-------------|---------------|-------------------|-------------|--------------|\n"
 
       for match in matches:
         comment += "| %s | %s | %s | %s | %s | %s |\n" % (
             match[0], match[1], match[2], match[3], match[4], match[5])
-      return {"validation": False, "comment": comment}
+      return {"validation": False, "comment": comment, "cyclondx": cyclondx}
