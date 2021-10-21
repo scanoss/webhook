@@ -1,7 +1,10 @@
-gitlab:
-  api-base: https://gitlab.com/api/v4
+github:
+  api-base: https://api.github.com
+  api-user: user_name
   api-key: the-api-key
   secret-token: my-token
 scanoss:
-  url: https://api-url-for-scanoss.example.com
+  url: https://osskb.org
   token: my-scanoss-token
+  comment_always: 1
+  sbom_filename: SBOM.json

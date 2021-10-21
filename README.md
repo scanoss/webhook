@@ -55,8 +55,10 @@ github:
   api-key: your-personal-access-token
   secret-token: your-secret-token
 scanoss:
-  url: https://api-url-for-scanoss.example.com
-  token: my-scanoss-token
+  url: https://api-url-for-scanoss.example.com # scanner api, https://osskb.org by default
+  token: my-scanoss-token # token for the scanning API. 
+  comment_always: 1 # post a comment for each scan, whatever you have a match or not
+  sbom_filename: SBOM.json # name of the sbom file sended as assets to the scanning API.
 
 ```
 
