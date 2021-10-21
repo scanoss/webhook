@@ -12,7 +12,7 @@ Python 3 is required. It uses setuptools to build a PIP wheel.
 
 - Generate a new wheel: `make dist`. The binaries will be located under `dist`.
 
-##Installation
+## Installation
 ### Local Installation
 
 If you have built the webhook locally, you have to call pip3 to install the whl file:
@@ -24,13 +24,13 @@ Just run in a terminal:
 ```
 /usr/local/bin/scanoss-hook --cfg ~/scanoss-hook.yaml --handler github
 ```
-Where "scanoss-hook.yaml" is the configuration file for the selected handler, github in this case. 
-Then, follow the GIT_WEBHOOK_CONFIG.md to configurate the webhook in the git repository.
+Where "scanoss-hook.yaml" is the configuration file for the selected handler, github in this case.
+Then, follow the GIT_WEBHOOK_CONFIG.md to configure the webhook for your GIT repository.
 
-##Useful scripts
+## Useful scripts
 
-###Service configuration
-At scripts/scanoss-hook-systemd you have an example about how to create a dameon for the service.
+### Service configuration
+At scripts/scanoss-hook-systemd you have an example about how to create a daemon for the service.
 ```
 #!/bin/bash
 # Replace {DEST} with your destination folder
@@ -39,7 +39,7 @@ At scripts/scanoss-hook-systemd you have an example about how to create a dameon
 Also you have scripts/scanoss-hook.service, to define the service:
 ```
 # Systemd script for scanoss-hook
-# Replace {DEST} with your destination folder 
+# Replace {DEST} with your destination folder
 [Unit]
 Description=SCANOSS webhook integration service
 After=network.target
@@ -55,13 +55,14 @@ ExecStart=/bin/bash {DEST}/scanoss-hook-systemd.sh
 [Install]
 WantedBy=multi-user.target
 ```
-You have to adjunt the configuration file folder and the desired handler.
-Then, copy this file to /etc/systemd/system as follows:
+You have to adjust the configuration file folder and the desired handler.
+Then, copy the necessary files as follow (replace {DEST} for the user folder, for example "/home/user/")
 ```
+cp test/scanoss-hook.yaml {DEST}
 cp scripts/scanoss-hook-systemd.sh {DEST}
 cp scripts/scanoss-hook.service /etc/systemd/system
 ```
-Now you are ready to start the service
+Now you are ready to start the service.
 ```
 service scanoss-hook start
 ```
@@ -74,11 +75,18 @@ And you can see the log file with:
 cat /log/scanoss-hook.log
 ```
 ### Remote Installation
-If you want to install the webhook in a remote server you can use the server install script (requires ssh):
+If you want to install the webhook in a remote server, you can use the server install script (requires ssh):
 ```
 sh scripts/server_install.sh server_name
 ```
-This will build, compile, install and start the service in the remote server. You need you config the service and daemon scrips first, as was explained in the previous section.
+This will build, install and start the service on the remote server. You need to config the service and daemon scripts first, as it was explained in the previous section. The scanoss-hook.yaml should be present in the folder {DEST} in the server. You can copy it with scp:
+```
+scp test/scanoss-hook.yaml {SERVER}:{DEST}
+
+```
+
+
+
 
 
 
