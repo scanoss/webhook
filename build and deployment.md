@@ -82,7 +82,6 @@ sh scripts/server_install.sh server_name
 This will build, install and start the service on the remote server. You need to config the service and daemon scripts first, as it was explained in the previous section. The scanoss-hook.yaml should be present in the folder {DEST} in the server. You can copy it with scp:
 ```
 scp test/scanoss-hook.yaml {SERVER}:{DEST}
-
 ```
 
 
