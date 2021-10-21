@@ -19,20 +19,12 @@ The specific instructions to install SCANOSS webhook depend on the particular ve
 To test the webhook, once configured, you can perform a commit. If all permissions are right and everything goes smoothly, you should see that the webhook has created a comment in your commit, containing a summary of the scan results.
 
 ### Github
-See the guide [How to config Github](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Github.md)
+See the guide [How to config Github](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Github.md).
 ### Bitbucket
-See the guide [How to config Bitbucket](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Bitbucket.md)
+See the guide [How to config Bitbucket](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Bitbucket.md).
 ### GitLab
-See the guide [How to config Gitlab](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Gitlab.md)
+See the guide [How to config Gitlab](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Gitlab.md).
 
 ## Contributing
 
 Please see our [Contributing Guide](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
-
-## Building
-
-Python 3 is required. It uses setuptools to build a PIP wheel.
-
-- Install dependencies: `make init && make init-dev`
-
-- Generate a new wheel: `make dist`. The binaries will be located under `dist`.
