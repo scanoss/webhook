@@ -1,4 +1,4 @@
-![SCANOSS Webhook logo](docs/webhook.png)
+![SCANOSS Webhook logo](webhook.png)
 
 # SCANOSS Webhook
 
