@@ -140,17 +140,12 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     repo = self.process_gh_request(repository)
     pull_resquest = repo.get_pull(pr.get('number'))
     commits = pull_resquest.get_commits()
-    commits_results = "Processed Commit \t Validated \n"
     summary_list = []
     for commit in commits:
       self.logger.debug(commit.sha)
-      result, commits_response = self.process_commit(repo,commit.sha)
-      if result is True:
-        commits_results += f"""{commit.sha} \t {MSG_VALIDATED} \n"""
-      else:
-        commits_results += f"""{commit.sha} \t {MSG_NO_VALIDATED} \n"""
-        summary_list.append(commits_response)
-    pull_resquest.create_issue_comment(commits_results)
+      result, comment = self.process_commit(repo,commit.sha)
+      if result is False or self.comment_always:
+        pull_resquest.create_issue_comment(comment)
     self.logger.debug(summary_list)
   
     self.logger.info("Finished processing PR")
@@ -165,12 +160,8 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     commit_data = repo.get_commit(sha=commit_id)
     files = commit_data.raw_data.get('files')
     commit_url = commit_data.raw_data.get('html_url')
-    logging.debug(json.dumps(commit_data.raw_data))
-    #committer = commit_data.raw_data.get('commit')['committer']
-    #commit_info = {'sha': commit_data.sha, 'user': committer['name'], 'email': committer['email'], 'url': commit_url, 'matches':[]}
     self.logger.debug(commit_url)
     for file in files:
-      logging.debug(file)
       code = (file['patch'])
       lines = code.split("\n")
       file_scan = False
@@ -180,7 +171,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
           break
       #wfp calculation
       if file_scan:
-        contents = repo.get_contents(file['filename'])
+        contents = repo.get_contents(file['filename'], ref=commit_id)
         if contents:
           files_content[file['filename']] = contents.decoded_content
 
@@ -208,7 +199,7 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
       
       self.logger.debug(full_comment)
       commit_data.create_comment(full_comment)
-    return result['validation']#, commit_info
+    return result['validation'], full_comment
 
 
   def process_commits_diff(self, repository, commits):

@@ -1,4 +1,5 @@
 # Systemd script for scanoss-hook
+# Replace {DEST} with your destination folder 
 [Unit]
 Description=SCANOSS webhook integration service
 After=network.target
@@ -9,7 +10,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/bin/bash /root/scanoss-hook-systemd.sh
+ExecStart=/bin/bash {DEST}/scanoss-hook-systemd.sh
 
 [Install]
 WantedBy=multi-user.target
