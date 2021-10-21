@@ -159,8 +159,6 @@ class GitHubRequestHandler(BaseHTTPRequestHandler):
     scan_result = {}
     commit_data = repo.get_commit(sha=commit_id)
     files = commit_data.raw_data.get('files')
-    commit_url = commit_data.raw_data.get('html_url')
-    self.logger.debug(commit_url)
     for file in files:
       code = (file['patch'])
       lines = code.split("\n")
