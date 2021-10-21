@@ -96,7 +96,7 @@ class Scanner:
     for f, m in scan_results.items():
       if m[0].get('id') != 'none':
         for match in m:
-          matches.append([f, match['purl'][0], match['version'], match['lines'], match['file_url'], match['oss_lines']])
+          matches.append([f, match['purl'][0], match['version'], match['lines'], match['file_url'], match['oss_lines'], match['url']])
           
           lic = []
           licenses = match['licenses']
@@ -105,8 +105,7 @@ class Scanner:
             for l in licenses:
               lic.append({ 'id': l["name"]})
           
-          m_type = 'Snippet' if match['id'] == 'snippet' else 'Library'
-          component = {"type": m_type, "publisher": match["vendor"], "version": match['version'], "purl" : match['purl'][0], 'licenses': lic}
+          component = {"type": "Library", "publisher": match["vendor"], "version": match['version'], "purl" : match['purl'][0], 'licenses': lic}
           logging.debug(json.dumps(component))
           cyclondx_components.append(component)
    # cyclondx["components"] = list(set(cyclondx_components)) # remove duplicated
@@ -117,6 +116,6 @@ class Scanner:
       comment = "| Commit File | Detected PURL | Version |Commit diff lines | Source Link | Source lines |\n|-----------|-------------|---------------|-------------------|-------------|--------------|\n"
 
       for match in matches:
-        comment += "| %s | %s | %s | %s | %s | %s |\n" % (
-            match[0], match[1], match[2], match[3], match[4], match[5])
+        comment += "| %s |[%s](%s) | %s | %s |[%s](%s) | %s |\n" % (
+            match[0], match[1],match[6], match[2], match[3], match[4].rsplit('/',1)[1],match[4], match[5])
       return {"validation": False, "comment": comment, "cyclondx": cyclondx}
