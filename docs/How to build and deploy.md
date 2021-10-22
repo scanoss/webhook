@@ -25,7 +25,10 @@ Just run in a terminal:
 /usr/local/bin/scanoss-hook --cfg ~/scanoss-hook.yaml --handler github
 ```
 Where "scanoss-hook.yaml" is the configuration file for the selected handler, github in this case.
-Then, follow the corresponding guide to configure the webhook for your GIT repository.
+Then, follow the corresponding guide to configure the webhook for your GIT repository:
+- [Github](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Github.md)
+- [Bitbucket](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Bitbucket.md)
+- [Gitlab](https://github.com/scanoss/webhook/blob/master/docs/How%20to%20config%20Gitlab.md)
 
 ## Useful scripts
 
