@@ -17,6 +17,7 @@ from .scanner import Scanner
 # CONSTANTS
 GL_HEADER_TOKEN = 'X-Gitlab-Token'
 GL_HEADER_EVENT = 'X-Gitlab-Event'
+GL_HEADER_TOTAL_PAGES = 'x-total-pages'
 
 GL_PUSH_EVENT = 'Push Hook'
 GL_MERGE_REQUEST_EVENT = 'Merge Request Hook'
@@ -55,15 +56,25 @@ class GitLabAPI:
     self.auth_headers = {'PRIVATE-TOKEN': self.api_key}
 
   def get_diff_json(self, project, commit):
-    request_url = "%s/projects/%d/repository/commits/%s/diff" % (
-        self.base_url, project['id'], commit['id'])
+    pg = 1
+    tot_page = 1
+    json = []
 
-    r = requests.get(request_url, headers=self.auth_headers)
-    if r.status_code != 200:
-      logging.error(
-          "There was an error trying to obtain diff for commit, the server returned status %d", r.status_code)
-      return None
-    return r.json()
+    while pg <= tot_page:
+      request_url = "%s/projects/%d/repository/commits/%s/diff?page=%d" % (
+          self.base_url, project['id'], commit['id'], pg)
+
+      r = requests.get(request_url, headers=self.auth_headers)
+      if r.status_code != 200:
+        logging.error(
+            "There was an error trying to obtain diff for commit, the server returned status %d", r.status_code)
+        return None
+
+      json += r.json()
+      tot_page = int(r.headers.get(GL_HEADER_TOTAL_PAGES) or 1)
+      pg += 1
+
+    return json
 
   def get_commit_diff(self, project, commit):
 
