@@ -98,7 +98,7 @@ class GitLabAPI:
     comments_url = "%s/projects/%d/repository/commits/%s/comments" % (
         self.base_url, project['id'], commit['id'])
     logging.debug("Post comment to URL: %s", comments_url)
-    r = requests.post(comments_url, params=comment, headers=self.auth_headers)
+    r = requests.post(comments_url, json=comment, headers=self.auth_headers)
     if r.status_code >= 400:
       logging.error(
           "There was an error posting a comment for commit, the server returned status %d", r.status_code)
@@ -122,7 +122,7 @@ class GitLabAPI:
     url = "%s/projects/%d/statuses/%s" % (self.base_url,
                                           project['id'], commit['id'])
     data = {"state": "success" if status else "failed"}
-    r = requests.post(url, params=data, headers=self.auth_headers)
+    r = requests.post(url, json=data, headers=self.auth_headers)
     if r.status_code >= 400:
       logging.error(
           "There was an error updating build status for commit %s", commit['id'])
