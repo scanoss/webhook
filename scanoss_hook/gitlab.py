@@ -204,8 +204,8 @@ class GitLabRequestHandler(BaseHTTPRequestHandler):
   def process_commits_diff(self, project, commits):
     logging.debug("Processing commits")
     # For each commit in push
-    files = {}
     for commit in commits:
+      files = {}
 
       # Get the contents of files in the commit
       for filename in self.api.get_files_in_commit_diff(project, commit):
